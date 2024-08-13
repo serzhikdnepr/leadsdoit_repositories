@@ -56,12 +56,9 @@ class RepositoryBloc extends Bloc<RepositoryEvent, RepositoryState> {
       ListRepositories event, Emitter<RepositoryState> emit) async {
     emit(SearchRepositoriesInProgress());
     favoriteList = _getFavoriteRepositoriesUseCase.execute();
-    historyList = _getHistoryRepositoriesUseCase.execute();
-    if (favoriteList.isNotEmpty) {
-      historyList = updateList(historyList);
-    }
+
     final response = await _searchRepositoriesUseCase.execute(
-        event.query, event.page, event.page);
+        event.query, event.page, event.perPage);
     switch (response.status) {
       case Status.SUCCESS:
         List<RepositoryItem> list = (favoriteList.isNotEmpty)
@@ -98,15 +95,17 @@ class RepositoryBloc extends Bloc<RepositoryEvent, RepositoryState> {
   }
 
   List<RepositoryItem> updateList(List<RepositoryItem> list) {
+    Set<num?> ids = favoriteList.map((repo) => repo.id).toSet();
     for (var repo in list) {
-      for (var favorites in favoriteList) {
-        if (favorites.id == repo.id) {
-          repo.isFavorite = true;
-        } else {
-          repo.isFavorite = false;
-        }
+      if (ids.contains(repo.id)) {
+        repo.isFavorite = true;
+      }else{
+        repo.isFavorite = false;
       }
+
     }
+
+
     return list;
   }
 
@@ -122,17 +121,18 @@ class RepositoryBloc extends Bloc<RepositoryEvent, RepositoryState> {
       favoriteList.removeWhere((element) => element.id == event.item.id);
     }
     await _saveFavoriteRepositoriesUseCase.execute(favoriteList);
-    var newList = event.list.map(
-      (e) {
-        if (event.item.id == e.id) {
-          e.isFavorite = event.item.isFavorite;
-        }
-        return e;
-      },
-    ).toList();
+
     if (event.isFavoriteScreen) {
       emit(FavoriteRepositoriesInSuccess(list: favoriteList));
     } else {
+      var newList = event.list.map(
+            (e) {
+          if (event.item.id == e.id) {
+            e.isFavorite = event.item.isFavorite;
+          }
+          return e;
+        },
+      ).toList();
       emit(SearchRepositoriesInSuccess(list: newList, event.isHistory));
     }
   }
@@ -142,7 +142,7 @@ class RepositoryBloc extends Bloc<RepositoryEvent, RepositoryState> {
     emit(SearchRepositoriesInProgress());
     favoriteList = _getFavoriteRepositoriesUseCase.execute();
     emit(SearchRepositoriesInSuccess(
-        list: (favoriteList.isNotEmpty) ? updateList(event.list) : event.list,
+        list: updateList(event.list),
         event.isHistory));
   }
 
